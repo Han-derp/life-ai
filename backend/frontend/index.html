@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f7f5ff">
+    <title>Life AI</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <div>
+            <div class="eyebrow">LIFE AI</div>
+            <h1 id="page-title">今天</h1>
+            <div id="today-label" class="muted"></div>
+        </div>
+        <div class="topbar-actions">
+            <span id="ai-status" class="status-pill">AI 检查中</span>
+            <button id="refresh-button" class="icon-button" title="刷新">↻</button>
+        </div>
+    </header>
+
+    <nav class="tabbar" aria-label="主导航">
+        <button class="tab active" data-view="today">今天</button>
+        <button class="tab" data-view="weekly">回顾</button>
+        <button class="tab" data-view="chat" id="chat-tab">聊天</button>
+        <button class="tab" data-view="her">关于TA</button>
+        <button class="tab" data-view="settings">设置</button>
+    </nav>
+
+    <main>
+        <section id="today-view" class="view active">
+            <!-- 站内提醒 ✓（2026-10-05 第三轮 ✓）——
+                 ⚠️ 只做**站内** ✗：关掉浏览器之后的通知是另一个交付能力 ✓（用户明确划的边界）。
+                 内容是**算出来的** ✓（过期的 DDL / 今天到期的 / 跑太久的步骤），
+                 处理完它**自己就没了** ✓ —— 所以这里没有"已读"按钮，这是故意的 ✓。 -->
+            <section id="reminder-strip" class="reminder-strip" aria-label="提醒" hidden></section>
+
+            <section class="action-center-card" aria-label="行动中心">
+                <div class="eyebrow">ACTION CENTER</div>
+                <h2>你现在想处理什么？</h2>
+                <p class="muted">告诉我目标、困难或当前状态，我会结合今天的安排给你一个可以执行的下一步。</p>
+                <form id="action-plan-form" class="action-plan-form">
+                    <textarea id="action-plan-input" rows="2" maxlength="4000" placeholder="例如：我下周要考试，但还没开始，今天也很累"></textarea>
+                    <button class="primary-button" type="submit">帮我安排</button>
+                </form>
+                <div class="action-quick-row">
+                    <button type="button" class="ghost-button action-quick" data-prompt="帮我安排今天最重要的事情">安排今天</button>
+                    <button type="button" class="ghost-button action-quick" data-prompt="我现在最应该做什么？">我该先做什么</button>
+                    <button type="button" class="ghost-button action-quick" data-prompt="根据最近的执行情况帮我复盘">帮我复盘</button>
+                </div>
+                <div id="action-plan-draft" class="action-plan-draft" hidden></div>
+                <div id="action-plan-list" class="stack-list"></div>
+            </section>
+            <section class="hero-card">
+                <div>
+                    <div class="eyebrow">TODAY SNAPSHOT</div>
+                    <h2 id="snapshot-title">把今天过清楚一点。</h2>
+                    <p id="snapshot-text" class="muted">正在读取今天的真实状态…</p>
+                </div>
+                <button id="open-review" class="primary-button">收今天的尾巴</button>
+            </section>
+
+            <section class="summary-grid" aria-label="今日概览">
+                <article class="metric-card"><span>待办 DDL</span><strong id="metric-deadlines">0</strong></article>
+                <article class="metric-card"><span>番茄</span><strong id="metric-pomodoro">0</strong><small id="metric-pomodoro-minutes">0 min</small></article>
+                <article class="metric-card"><span>习惯达标</span><strong id="metric-habits">0/0</strong></article>
+            </section>
+
+            <div class="content-grid">
+                <div class="section-heading">计划
+                    <small>还没发生的事：日程、DDL、习惯。这里只是"准备"，不代表做到了。</small>
+                </div>
+
+                <!-- 计划：三张**摘要卡** ✓
+                     ⚠️ 每张卡只放**一条** ✓（时间最近的日程 / 最紧的 DDL / 最新的习惯 ✓）——
+                     全部内容在**点开之后**的列表页里 ✓（三类筛选 ✓）。
+                     原来是把所有条目铺在首页 ✗ —— 条目一多卡片就变得很长，
+                     而且左右并排的两张卡内容数不一样时高度参差 ✓（用户 2026-10-05 提出 ✓）。 -->
+                <section class="plan-grid" aria-label="计划：日程 / DDL / 习惯">
+                    <article class="plan-card" id="plan-card-schedule" role="button" tabindex="0"
+                             aria-label="查看全部日程">
+                        <header class="plan-card-head">
+                            <div><div class="eyebrow">SCHEDULE</div><h2>日程</h2></div>
+                            <button class="ghost-button" data-open-dialog="schedule-dialog">+ 日程</button>
+                        </header>
+                        <div id="schedule-summary" class="plan-summary"></div>
+                        <footer class="plan-card-foot">查看全部 <span aria-hidden="true">→</span></footer>
+                    </article>
+
+                    <article class="plan-card" id="plan-card-deadline" role="button" tabindex="0"
+                             aria-label="查看全部 DDL">
+                        <header class="plan-card-head">
+                            <div><div class="eyebrow">DEADLINES</div><h2>DDL</h2></div>
+                            <button class="ghost-button" data-open-dialog="deadline-dialog">+ DDL</button>
+                        </header>
+                        <div id="deadline-summary" class="plan-summary"></div>
+                        <footer class="plan-card-foot">查看全部 <span aria-hidden="true">→</span></footer>
+                    </article>
+
+                    <article class="plan-card" id="plan-card-habit" role="button" tabindex="0"
+                             aria-label="查看全部习惯">
+                        <header class="plan-card-head">
+                            <div><div class="eyebrow">HABITS</div><h2>习惯</h2></div>
+                            <button class="ghost-button" data-open-dialog="habit-dialog">+ 习惯</button>
+                        </header>
+                        <div id="habit-summary" class="plan-summary"></div>
+                        <footer class="plan-card-foot">查看全部 <span aria-hidden="true">→</span></footer>
+                    </article>
+                </section>
+
+                <div class="section-heading">实际发生
+                    <small>真的做过的事：番茄会在这里自动落一条，时间轴也可以手记。</small>
+                </div>
+
+                <section class="panel pomodoro-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">FOCUS</div><h2>番茄钟</h2></div>
+                    </div>
+                    <div id="pomodoro-idle">
+                        <label>绑定事项
+                            <select id="pomodoro-target"></select>
+                        </label>
+                        <input id="pomodoro-custom" type="text" maxlength="200" placeholder="临时事项，例如：整理笔记" hidden>
+                        <div class="inline-fields">
+                            <label>分钟 <input id="pomodoro-minutes" type="number" min="1" max="180" value="25"></label>
+                            <button id="start-pomodoro" class="primary-button">开始专注</button>
+                        </div>
+                    </div>
+                    <div id="pomodoro-running" class="focus-running" hidden>
+                        <span class="muted">正在专注</span>
+                        <strong id="pomodoro-label">—</strong>
+                        <div id="pomodoro-clock" class="focus-clock">25:00</div>
+                        <div class="button-row">
+                            <button id="finish-pomodoro" class="primary-button">结束并记录</button>
+                            <button id="cancel-pomodoro" class="danger-ghost">取消</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ⚠️ **不加 `wide-panel`** ✓ —— 加了它会占满两列，
+                     而上面那张卡只占一列 → 右边留出**一大片空白** ✗
+                     （用户 2026-10-06："今天页面大片空白" ✓）。
+                     现在两张卡各占一列 ✓，和上面的三张计划卡对齐 ✓。 -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">REALITY</div><h2>实际时间轴</h2></div>
+                        <button class="ghost-button" data-open-dialog="timeline-dialog">+ 记录</button>
+                    </div>
+                    <div id="timeline-list" class="timeline-list"></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="weekly-view" class="view">
+            <section class="hero-card">
+                <div>
+                    <div class="eyebrow">WEEKLY STATS</div>
+                    <h2 id="weekly-range-label">本周</h2>
+                    <p class="muted">
+                        程序统计的这一周事实数据。
+                        <span id="weekly-current-badge" class="badge ongoing" hidden>本周</span>
+                    </p>
+                </div>
+                <div class="button-row">
+                    <button id="weekly-prev" class="ghost-button">← 上一周</button>
+                    <button id="weekly-current" class="ghost-button">本周</button>
+                    <button id="weekly-next" class="ghost-button">下一周 →</button>
+                </div>
+            </section>
+
+            <div class="content-grid">
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">PLAN</div><h2>日程</h2></div>
+                    </div>
+                    <section class="summary-grid" aria-label="日程统计">
+                        <article class="metric-card"><span>总数</span><strong id="weekly-schedule-total">0</strong></article>
+                        <article class="metric-card"><span>完成</span><strong id="weekly-schedule-completed">0</strong></article>
+                        <article class="metric-card"><span>待办</span><strong id="weekly-schedule-pending">0</strong></article>
+                        <article class="metric-card"><span>取消</span><strong id="weekly-schedule-cancelled">0</strong></article>
+                    </section>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">FOCUS</div><h2>番茄</h2></div>
+                    </div>
+                    <section class="summary-grid" aria-label="番茄统计">
+                        <article class="metric-card"><span>完成次数</span><strong id="weekly-pomodoro-count">0</strong></article>
+                        <article class="metric-card"><span>专注时长</span><strong id="weekly-pomodoro-minutes">0 min</strong></article>
+                    </section>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">DEADLINES</div><h2>DDL</h2></div>
+                    </div>
+                    <section class="summary-grid" aria-label="DDL 统计">
+                        <article class="metric-card"><span>完成</span><strong id="weekly-deadline-completed">0</strong></article>
+                        <article class="metric-card"><span>本周逾期未完成</span><strong id="weekly-deadline-overdue">0</strong></article>
+                        <article class="metric-card"><span>新建</span><strong id="weekly-deadline-created">0</strong></article>
+                    </section>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">HABITS</div><h2>习惯</h2></div>
+                    </div>
+                    <div id="weekly-habit-list" class="stack-list"></div>
+                </section>
+            </div>
+        </section>
+
+
+        <section id="chat-view" class="view chat-view">
+            <div class="chat-main">
+                <div class="chat-header-card">
+                    <div>
+                        <div class="eyebrow">PERSONA</div>
+                        <h2 id="chat-persona-title">他</h2>
+                        <p class="muted">他会读取今天的结构化生活数据，但不会替你修改它。右边能看到他是谁、这次会读到什么。</p>
+                    </div>
+                    <button id="quick-today-question" class="ghost-button">我今天怎么样？</button>
+                </div>
+                <div id="chat-messages" class="chat-messages"></div>
+                <form id="chat-form" class="chat-composer">
+                    <div id="chat-image-preview" class="chat-image-preview" hidden>
+                        <div class="chat-image-frame">
+                            <img id="chat-image-thumb" class="chat-image-thumb" alt="要发送的图片">
+                            <button id="chat-image-clear" type="button" class="chat-image-remove" title="去掉这张图">×</button>
+                        </div>
+                        <p id="chat-image-note" class="muted"></p>
+                    </div>
+
+                    <div class="chat-composer-main">
+                        <textarea id="chat-input" rows="1" maxlength="12000" placeholder="跟他说点什么…"></textarea>
+                        <button id="chat-send" type="submit" class="primary-button">发送</button>
+                    </div>
+
+                    <div class="chat-composer-tools">
+                        <button id="chat-image-pick" type="button" class="ghost-button">图片</button>
+                        <span id="privacy-status" class="privacy-status">AI 请求使用已配置的模型服务</span>
+                    </div>
+
+                    <input id="chat-image-input" type="file" accept="image/*" hidden>
+                </form>
+            </div>
+
+            <aside id="context-panel" class="context-panel" aria-label="这次会发送什么">
+                <section class="persona-box">
+                    <div class="eyebrow">PERSONA</div>
+                    <h3>他是谁</h3>
+                    <p class="muted">换一个 <code>personas/</code> 目录就是换一个人，不用改代码。</p>
+                    <label class="persona-select-row">
+                        <span>当前人格</span>
+                        <select id="persona-select"></select>
+                    </label>
+                    <button id="persona-new-toggle" type="button" class="mini-button secondary">新建人格</button>
+                    <form id="persona-form" class="persona-form" hidden>
+                        <label>目录名（字母 / 数字 / 下划线）
+                            <input id="persona-name" maxlength="64" placeholder="my_persona" required>
+                        </label>
+                        <label>界面上显示的名字
+                            <input id="persona-display-name" maxlength="64" placeholder="他的名字">
+                        </label>
+                        <label>他是谁
+                            <textarea id="persona-content" rows="7" maxlength="8000" placeholder="你是……（性格、说话方式、立场）" required></textarea>
+                        </label>
+                        <button type="submit" class="primary-button">创建并启用</button>
+                    </form>
+                </section>
+
+                <div class="context-panel-head">
+                    <div class="eyebrow">CONTEXT</div>
+                    <h3>这次会发送什么</h3>
+                    <p class="muted">他这次会读到下面这些。点标题展开原文；关掉的会灰掉，但不会消失。</p>
+                </div>
+                <div id="context-blocks" class="context-blocks"></div>
+                <div class="context-footer">
+                    <div id="context-total" class="context-total">合计 — / —</div>
+                    <div id="context-cache" class="context-cache muted"></div>
+                    <div id="context-notice" class="context-notice" hidden></div>
+                </div>
+            </aside>
+        </section>
+
+        <section id="her-view" class="view">
+            <section class="hero-card">
+                <div>
+                    <div class="eyebrow">MEMORY</div>
+                    <h2>他记得的一切</h2>
+                    <p class="muted">从你说的原话，到他记下的事实，再到他对你的判断——三层都在这里，一条都不藏。<strong>原话永不改写</strong>；事实能删；判断不能删，只能标异议或撤回。</p>
+                </div>
+                <button id="her-refresh" class="ghost-button">刷新</button>
+            </section>
+
+            <nav id="her-nav" class="sub-nav" aria-label="记忆分区">
+                <button type="button" class="sub-nav-item" data-her-goto="quotes">原话</button>
+                <button type="button" class="sub-nav-item" data-her-goto="facts">事实</button>
+                <button type="button" class="sub-nav-item" data-her-goto="impressions">判断</button>
+                <button type="button" class="sub-nav-item" data-her-goto="tags">标签</button>
+                <button type="button" class="sub-nav-item" data-her-goto="promises">承诺</button>
+                <button type="button" class="sub-nav-item" data-her-goto="rules">规则</button>
+            </nav>
+
+            <section class="panel" data-her-pane="quotes">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">QUOTES</div>
+                        <h2>你说过的每一句话</h2>
+                    </div>
+                </div>
+                <p class="muted rules-hint">
+                    <strong>这里是他记下的全部原话</strong> ✓ —— 不只是"被抽成事实"的那些 ✓。
+                    ⚠️ 这一层<strong>只读</strong> ✗：原话只追加、永不改写 ✓，
+                    所以"他凭什么这么说"永远查得到 ✓。
+                    每条下面写着<strong>从它抽出了几条事实</strong>（没抽到也是正常的 ✓）。
+                </p>
+                <div id="quote-list" class="evidence-list"></div>
+            </section>
+
+            <section class="panel" data-her-pane="facts">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">FACTS</div>
+                        <h2>他记得的事实</h2>
+                    </div>
+                </div>
+                <p class="muted rules-hint">
+                    从你说过的话里抽出来的事实，每条都带着<strong>你的原话</strong>（最近 30 条）。
+                    记错了就<strong>删掉这条</strong>，然后<strong>重新说一遍</strong> ✓ ——
+                    文字不给手改，因为一改它就对不上原话了（不变量 5）✓。
+                    删的时候如果它是某条判断的<strong>唯一依据</strong>，他会拒绝并告诉你该补哪条 ✓。
+                </p>
+                <div id="observation-list" class="evidence-list"></div>
+            </section>
+
+            <section class="panel" data-her-pane="impressions">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">JUDGEMENTS</div>
+                        <h2>他对你的判断</h2>
+                    </div>
+                </div>
+                <p class="muted rules-hint">
+                    每条判断都能点开看依据——依据是你说过的话。你可以认同、异议，或者改过之后撤回上一代。
+                    <strong>判断不能删</strong>（不变量 6）：他可以改看法，但不许假装从来没想过 ✓。
+                </p>
+                <div id="her-impressions" class="her-list"></div>
+            </section>
+
+            <section class="panel" data-her-pane="tags">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">TAGS</div>
+                        <h2>标签</h2>
+                    </div>
+                    <button id="tag-new-toggle" type="button" class="ghost-button">+ 标签</button>
+                </div>
+                <p class="muted rules-hint">
+                    归纳靠标签判断「同类」—— <strong>同一个标签下攒够 3 条事实，才会形成一条判断</strong>。
+                    所以标签不是装饰，它是"把事想成一句话"的依据。
+                    删标签只取消分类，<strong>不会删掉事实</strong>。
+                </p>
+
+                <form id="tag-form" class="rule-form" hidden>
+                    <label>名字
+                        <input id="tag-name" maxlength="40" placeholder="熬夜 / 写作 / 考试" required>
+                    </label>
+                    <label>维度
+                        <select id="tag-dimension">
+                            <option value="pattern">pattern · 行为模式</option>
+                            <option value="state">state · 状态</option>
+                            <option value="domain">domain · 领域</option>
+                            <option value="object">object · 对象</option>
+                            <option value="time">time · 时间</option>
+                        </select>
+                    </label>
+                    <button type="submit" class="primary-button">创建标签</button>
+                </form>
+
+                <div id="tag-suggestion-box" hidden>
+                    <div class="tag-group-title">TA的建议（你批准了才会变成标签）</div>
+                    <div id="tag-suggestions"></div>
+                </div>
+
+                <div id="tag-list" class="tag-list"></div>
+            </section>
+
+            <section class="panel rules-panel" data-her-pane="promises">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">PROMISES</div>
+                        <h2>他答应过什么</h2>
+                    </div>
+                    <button id="promise-new-toggle" type="button" class="ghost-button">+ 承诺</button>
+                </div>
+                <p class="muted rules-hint">他答应过的事，以及你当时的原话。带「别找我」时段的承诺可以被程序核对——因为能被验证守约，比记得更全更像人。</p>
+
+                <form id="promise-form" class="rule-form" hidden>
+                    <label>他答应了什么（他的原话）
+                        <input id="promise-content" maxlength="600" placeholder="行。那你也别十一点后还醒着。" required>
+                    </label>
+                    <label>你的原话
+                        <input id="promise-source" maxlength="1000" placeholder="以后十一点以后别找我">
+                    </label>
+                    <label>别找我的时段 · 开始
+                        <input id="promise-quiet-start" type="time">
+                    </label>
+                    <label>别找我的时段 · 结束（留空＝当天开始之后）
+                        <input id="promise-quiet-end" type="time">
+                    </label>
+                    <button type="submit" class="primary-button">保存承诺</button>
+                </form>
+
+                <div id="promise-list" class="stack-list"></div>
+            </section>
+
+            <section class="panel rules-panel" data-her-pane="rules">
+                <div class="panel-header">
+                    <div>
+                        <div class="eyebrow">RULES</div>
+                        <h2>他的规则</h2>
+                    </div>
+                    <button id="rule-new-toggle" type="button" class="ghost-button">+ 规则</button>
+                </div>
+                <p class="muted rules-hint">聊天能改他，界面也能改他。界面手改的优先于他从聊天理解的——你随时能夺回控制权。</p>
+
+                <form id="rule-form" class="rule-form" hidden>
+                    <label>规则内容
+                        <input id="rule-content" maxlength="300" placeholder="23:00 之后不主动联系" required>
+                    </label>
+                    <label>期限（留空＝永久；填日期＝当日有效）
+                        <input id="rule-expires" type="date">
+                    </label>
+                    <label>来源原话（可选，但强烈建议填）
+                        <input id="rule-source" maxlength="1000" placeholder="你当时说的那句话">
+                    </label>
+                    <button type="submit" class="primary-button">保存规则</button>
+                </form>
+
+                <div id="rule-list" class="stack-list"></div>
+            </section>
+        </section>
+
+        <section id="settings-view" class="view">
+            <section class="hero-card">
+                <div>
+                    <div class="eyebrow">SETTINGS</div>
+                    <h2>先让他能说话</h2>
+                    <p class="muted">API Key 只写进 <code>backend/.env</code>，<strong>不进数据库</strong>。保存后立即生效，不用重启服务。</p>
+                </div>
+            </section>
+
+            <div class="content-grid settings-grid">
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">DEFAULT</div><h2>默认配置（三档的回落目标）</h2></div>
+                    </div>
+                    <p class="muted">当前：<strong id="settings-key-state">读取中…</strong></p>
+
+                    <form id="settings-form" class="rule-form">
+                        <label>API Key（留空＝不改）
+                            <input id="settings-api-key" type="password" maxlength="200"
+                                   placeholder="sk-…" autocomplete="off">
+                        </label>
+                        <label>模型
+                            <select id="settings-model"></select>
+                        </label>
+                        <div class="button-row">
+                            <button type="submit" class="primary-button">保存</button>
+                            <button id="settings-test" type="button" class="ghost-button">测试连接</button>
+                        </div>
+                    </form>
+
+                    <div id="settings-test-result" class="empty-state" hidden></div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">MODEL ROUTING</div><h2>模型调用分工</h2></div>
+                    </div>
+                    <p class="muted">所有 AI 功能均通过下方配置的 OpenAI 兼容模型服务调用。不同任务可以使用不同模型档。</p>
+                    <div id="settings-config-warning" class="configuration-warning" hidden></div>
+                    <div id="settings-routing" class="settings-list"></div>
+                    <p class="muted">配置文件：<code id="settings-env-path">—</code></p>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">PASSWORD</div><h2>访问密码</h2></div>
+                    </div>
+                    <p class="muted">
+                        只有要让**别的设备**连进来时才需要 ✓（手机 / 平板 ✓）。
+                        设了之后<strong>立刻生效，不用重启</strong>，但这台浏览器会被顺手登录上 ✓。
+                    </p>
+                    <div id="settings-password" class="settings-mode"></div>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">APPEARANCE</div><h2>外观</h2></div>
+                    </div>
+                    <div id="settings-theme" class="settings-mode"></div>
+                    <p class="muted">只影响观感，不影响任何功能。存在本机浏览器里。</p>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">MODELS</div><h2>模型分档</h2></div>
+                    </div>
+                    <p class="muted">
+                        按任务<strong>需要什么能力</strong>分三档，每一档都能填不同的模型。
+                        留空就沿用上面的「默认配置」。
+                    </p>
+                    <div id="settings-tiers" class="settings-mode"></div>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">PERSONA</div><h2>TA 是谁</h2></div>
+                    </div>
+                    <p class="muted">
+                        人格文件归你。保存后<strong>下一条消息就生效</strong>，不用重启；
+                        旧版会留一份 <code>.bak</code>。
+                    </p>
+                    <div id="settings-persona" class="settings-mode"></div>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">MEMORY</div><h2>记忆抽取</h2></div>
+                        <button id="extract-now" type="button" class="ghost-button">现在抽取</button>
+                    </div>
+                    <p class="muted">
+                        把你说过的话拆成一条条事实。使用上面「硬核」模型档配置的服务。
+                    </p>
+                    <p class="muted">还有 <strong id="extract-pending">—</strong> 条消息没抽。</p>
+
+                    <details class="import-block">
+                        <summary>导入记忆（把别处记下的事实贴进来）</summary>
+                        <p class="muted">
+                            把你以前记在别处的事情贴进来 ✓ —— 它们会被当成"你说过的话"，
+                            由正常流程抽成事实 ✓（所以每条都有出处 ✓）。
+                            ⚠️ 它<strong>不会</strong>进聊天记录，也不会进每次请求的上下文 ✓。
+                        </p>
+                        <textarea id="import-text" rows="5"
+                                  placeholder="下个月要考试&#10;周三 14:00 高数期中，教三 201"></textarea>
+                        <div class="button-row">
+                            <button id="import-now" type="button" class="ghost-button">导入</button>
+                        </div>
+                    </details>
+
+                    <div id="extract-result" class="empty-state" hidden></div>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">IMPRESSION</div><h2>印象归纳</h2></div>
+                        <button id="impression-now" type="button" class="ghost-button">现在归纳</button>
+                    </div>
+                    <p class="muted">
+                        把攒够的同类事实归纳成一条<strong>判断</strong>。
+                        「同类」靠<strong>标签</strong>判断 —— 同一个标签下攒够 3 条才会归纳。
+                        这是故意的：一次熬夜不叫"作息问题"。
+                    </p>
+                    <p class="muted">
+                        ⚠️ 归纳需要多事件推理，本地小模型做不了 ——
+                        所以它默认走上面「硬核」那一档配的模型。
+                    </p>
+                    <div id="impression-result" class="empty-state" hidden></div>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div class="panel-header">
+                        <div><div class="eyebrow">BACKUP</div><h2>导出 / 备份</h2></div>
+                    </div>
+                    <p class="muted">
+                        这套东西的价值就是<strong>它记得你</strong> —— 而它只有一份。隔一阵备份一次。
+                    </p>
+                    <div class="button-row">
+                        <a class="ghost-button" href="/api/v1/export/backup.zip" download>下载完整备份（.zip）</a>
+                        <a class="ghost-button" href="/api/v1/export/json" download>导出为 JSON（可读）</a>
+                    </div>
+                    <p class="muted">
+                        <strong>ZIP</strong> 里是 <code>app.db</code> + <code>images/</code>，
+                        <strong>可以直接换回去</strong>；服务端也会留一份
+                        （<code>backend/storage/backups/</code>）。
+                        <strong>JSON</strong> 不含图片文件，胜在能直接打开看。
+                        两个都<strong>不含 API Key</strong> —— 那在 <code>.env</code> 里，你自己留着。
+                    </p>
+                </section>
+            </div>
+        </section>
+    </main>
+</div>
+
+<button id="fab" class="fab" title="快速新增">＋</button>
+<div id="fab-menu" class="fab-menu" hidden>
+    <button data-open-dialog="schedule-dialog">日程</button>
+    <button data-open-dialog="deadline-dialog">DDL</button>
+    <button data-open-dialog="habit-dialog">习惯</button>
+    <button data-open-dialog="timeline-dialog">时间轴</button>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<dialog id="schedule-dialog">
+    <form id="schedule-form" class="dialog-form">
+        <div class="dialog-title"><h3>新增日程</h3><button type="button" class="dialog-close">×</button></div>
+        <label>标题 <input name="title" maxlength="200" required></label>
+        <label>开始 <input name="start" type="datetime-local" required></label>
+        <label>结束 <input name="end" type="datetime-local"></label>
+        <label>备注 <textarea name="note" rows="2"></textarea></label>
+        <button class="primary-button" type="submit">保存日程</button>
+    </form>
+</dialog>
+
+<dialog id="deadline-dialog">
+    <form id="deadline-form" class="dialog-form">
+        <div class="dialog-title"><h3>新增 DDL</h3><button type="button" class="dialog-close">×</button></div>
+        <label>标题 <input name="title" maxlength="200" required></label>
+        <label>截止 <input name="due" type="datetime-local" required></label>
+        <label>优先级
+            <select name="priority"><option value="0">普通</option><option value="1">重要</option><option value="2">很重要</option></select>
+        </label>
+        <button class="primary-button" type="submit">保存 DDL</button>
+    </form>
+</dialog>
+
+<dialog id="habit-dialog">
+    <form id="habit-form" class="dialog-form">
+        <div class="dialog-title"><h3>新增习惯</h3><button type="button" class="dialog-close">×</button></div>
+        <label>名称 <input name="name" maxlength="120" required></label>
+        <label>记录方式
+            <select name="tracking_type" id="habit-type">
+                <option value="boolean">完成 / 未完成</option>
+                <option value="numeric">数值累计</option>
+                <option value="duration">时长累计</option>
+                <option value="time">时间点</option>
+            </select>
+        </label>
+        <div id="habit-number-fields" hidden>
+            <label>单位 <input name="unit" placeholder="ml / 页 / 次"></label>
+            <label>目标值 <input name="target_value" type="number" step="any"></label>
+        </div>
+        <div id="habit-time-fields" hidden>
+            <label>目标时间 <input name="target_text" type="time" value="23:30"></label>
+            <label>跨日锚点 <input name="time_anchor" type="time" value="18:00"></label>
+        </div>
+        <button class="primary-button" type="submit">创建习惯</button>
+    </form>
+</dialog>
+
+<dialog id="timeline-dialog">
+    <form id="timeline-form" class="dialog-form">
+        <div class="dialog-title"><h3>记录实际发生</h3><button type="button" class="dialog-close">×</button></div>
+        <label>发生了什么 <input name="title" maxlength="200" required></label>
+        <label>开始 <input name="start" type="datetime-local" required></label>
+        <label>结束 <input name="end" type="datetime-local"></label>
+        <button class="primary-button" type="submit">记到时间轴</button>
+    </form>
+</dialog>
+
+<dialog id="review-dialog" class="review-dialog">
+    <div class="dialog-form">
+        <div class="dialog-title"><div><div class="eyebrow">DAILY REVIEW</div><h3>收今天的尾巴</h3></div><button type="button" class="dialog-close">×</button></div>
+        <div id="review-loading" class="empty-state">正在整理今天…</div>
+        <div id="review-content" hidden>
+            <div id="review-stats" class="review-stats"></div>
+            <div class="review-copy"><h4>今天</h4><p id="review-summary"></p></div>
+            <div class="review-copy"><h4>值得肯定</h4><p id="review-affirmation"></p></div>
+            <div class="review-copy"><h4>最需要调整</h4><p id="review-issue"></p></div>
+            <div class="review-copy"><h4>明日重点</h4><div id="review-focus" class="focus-list"></div></div>
+            <div class="button-row">
+                <button id="confirm-review" class="primary-button">确认并归档</button>
+                <button id="regenerate-review" class="ghost-button">重新生成</button>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<!-- ── 三个「查看全部」列表页 ──────────────────────────────────
+     形状完全一样 ✓：标题 + 三类筛选 + 列表 ✓，所以样式和逻辑都共用一套 ✓。
+     ⚠️ 用 dialog 而不是新增**主标签页** ✗ —— 顶栏已经 5 个，再加就挤了 ✓
+     （G16 那条"没加新的主标签页，用页内导航代替"是同一个理由 ✓）。 -->
+<dialog id="schedule-list-dialog" class="list-dialog">
+    <div class="dialog-form">
+        <div class="dialog-title">
+            <div><div class="eyebrow">SCHEDULE</div><h3>全部日程</h3></div>
+            <button type="button" class="dialog-close">×</button>
+        </div>
+        <div class="sub-nav" data-list-filter="schedule">
+            <button type="button" class="sub-nav-item" data-filter-value="all">全部</button>
+            <button type="button" class="sub-nav-item" data-filter-value="completed">已完成</button>
+            <button type="button" class="sub-nav-item" data-filter-value="pending">未完成</button>
+        </div>
+        <div id="schedule-all-list" class="stack-list list-scroll"></div>
+    </div>
+</dialog>
+
+<dialog id="deadline-list-dialog" class="list-dialog">
+    <div class="dialog-form">
+        <div class="dialog-title">
+            <div><div class="eyebrow">DEADLINES</div><h3>全部 DDL</h3></div>
+            <button type="button" class="dialog-close">×</button>
+        </div>
+        <div class="sub-nav" data-list-filter="deadline">
+            <button type="button" class="sub-nav-item" data-filter-value="all">全部</button>
+            <button type="button" class="sub-nav-item" data-filter-value="completed">已完成</button>
+            <button type="button" class="sub-nav-item" data-filter-value="pending">未完成</button>
+        </div>
+        <div id="deadline-all-list" class="stack-list list-scroll"></div>
+    </div>
+</dialog>
+
+<dialog id="habit-list-dialog" class="list-dialog">
+    <div class="dialog-form">
+        <div class="dialog-title">
+            <div><div class="eyebrow">HABITS</div><h3>全部习惯</h3></div>
+            <button type="button" class="dialog-close">×</button>
+        </div>
+        <div class="sub-nav" data-list-filter="habit">
+            <button type="button" class="sub-nav-item" data-filter-value="all">全部</button>
+            <button type="button" class="sub-nav-item" data-filter-value="active">养成中</button>
+            <button type="button" class="sub-nav-item" data-filter-value="archived">已结束</button>
+        </div>
+        <div id="habit-all-list" class="stack-list list-scroll"></div>
+    </div>
+</dialog>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

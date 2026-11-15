@@ -1,0 +1,17 @@
+.venv/
+.env
+
+__pycache__/
+*.pyc
+
+# ⚠️ 这个文件在 `backend/` 里面 ✓ —— 所以路径是**相对 `backend/`** 的 ✓。
+# 原来写成 `backend/storage/*.db` ✗ → 实际解析成 `backend/backend/storage/*.db` ✓
+# → **一条都匹配不到** ✗（2026-10-05 由文档审计发现 ✓）。
+# 根目录的 `.gitignore` 兜住了数据库 ✓，但图片和备份是两边都漏 ✗。
+storage/*.db
+storage/*.db-shm
+storage/*.db-wal
+storage/images/
+storage/backups/
+
+.vscode/

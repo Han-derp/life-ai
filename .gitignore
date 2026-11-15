@@ -1,0 +1,113 @@
+# ─────────────────────────────────────────────
+# 机密：绝对不能提交
+# ─────────────────────────────────────────────
+backend/.env
+.env
+.env.local
+
+# ─────────────────────────────────────────────
+# 你的私人数据：绝对不能提交
+# ─────────────────────────────────────────────
+# 这里是你的生活事实、聊天记录、以后的记忆库。
+# 一旦提交进 git，即使以后删除，历史里仍然留着一份。
+backend/storage/*.db
+backend/storage/*.db-wal
+backend/storage/*.db-shm
+backend/storage/integration-test.db*
+!backend/storage/.gitkeep
+
+# ⚠️ 2026-10-05 补上 —— **图片和备份也必须挡** ✗
+# `storage/images/` 是你发过的**私人图片** ✓；
+# `storage/backups/` 里是**整个记忆库**的 ZIP ✓✓（备份越全，泄漏越狠 ✗）。
+# 上面那段自己就写着"一旦提交进 git，历史里仍然留着一份" ✓ ——
+# 而这两条原来**是漏的** ✗。
+backend/storage/images/
+backend/storage/backups/
+
+# ─────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────
+.venv/
+**/.venv/
+**/venv/
+**/__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+
+# ─────────────────────────────────────────────
+# 模型文件（体积巨大，不进仓库）
+# ─────────────────────────────────────────────
+*.gguf
+*.safetensors
+models/
+
+# ─────────────────────────────────────────────
+# 测试与工具缓存
+# ─────────────────────────────────────────────
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+# ⚠️ pytest 的 tmp_path 产物会**长在项目里**（每跑一次测试多一代 ✗）——
+# 曾经堆到 `backend/pytest-of-19362/pytest-46/` 才被发现 ✓。
+# 删掉它们不影响任何东西 ✓（它们只是测试用过的临时目录）。
+pytest-of-*/
+**/pytest-of-*/
+
+# ⚠️ 2026-10-05 补上**第二批** —— 同一件事的另一半 ✗
+# `conftest.isolated_database` 用 `tempfile.TemporaryDirectory()` 建测试库 ✓，
+# 而这台机器上 `tempfile.gettempdir()` 解析到了**项目里** ✓ →
+# 每跑一次测试就留下一个 `backend/tmpXXXXXXXX/`（里面只有一个 `test.db` ✓）。
+# Windows 上 WAL 句柄没释放，`cleanup()` 删不掉 ✓ → 于是一代一代堆 ✓
+#（实测 12 个 ≈ 3.4MB，最早的从 10-04 就在 ✓）。
+#
+# ⚠️ 它们**不是**你的数据 ✓（是测试用的空库 ✓）—— 但**不挡就会提交进去** ✗，
+# 而且会让 `rg` / 搜索工具在 `backend/` 根目录直接报 IO 错 ✓（真发生过 ✓）。
+backend/tmp*/
+
+# ─────────────────────────────────────────────
+# 编辑器 / 系统
+# ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ─────────────────────────────────────────────
+# 临时文件
+# ─────────────────────────────────────────────
+*.log
+*.tmp
+~$*
+
+# Local integration/audit artifacts (not part of the development baseline)
+/_merge_validation/
+/_attachments_text/
+/_incoming*/
+/_libs/
+/_pack/
+/v15纯源码包/
+/历史/
+/backend/*.bak-round*/
+*.zip
+*.bak
+/backend_app_tree.txt
+/backend_tests_tree.txt
+/project_tree.txt
+/附件*
+/软件创新大赛评分细则*.pdf
+/Life AI 项目优化方案与团队讨论稿.md
+
+# Protect all runtime storage, keeping only the directory placeholder.
+/backend/storage/*
+!/backend/storage/.gitkeep
+.env.*
+!.env.example
+*.pem
+*.key

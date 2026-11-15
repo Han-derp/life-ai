@@ -1,0 +1,1 @@
+console.log("Life AI frontend loaded");
